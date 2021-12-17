@@ -1,7 +1,6 @@
 import random
 import redis
 from faker import Faker
-from pprint import pprint
 from typing import List, Tuple, Dict, Optional
 
 fake = Faker()
@@ -52,10 +51,17 @@ class NotEnoughInStock(Exception):
 
 class Retailer:
 
-    def __init__(self):
+    def __init__(self, supplier: Supplier = Supplier()):
         self._redis_instance = redis.Redis(db=4)
+        self._supplier = supplier
+
+    def order_latest_from_supplier(self, positions_count: int = 0):
+        self._supplier.deliver(positions_count)
 
     def show_goods_available(self) -> List[bytes]:
+        """Get list of ids, e.g.:
+        [b'item:2833270290', b'item:162468497', b'item:3066974616']
+        """
         return self._redis_instance.keys()
 
     def get_item_info(self, item_id: str) -> Dict[bytes, bytes]:
