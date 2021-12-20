@@ -4,6 +4,7 @@ import re
 import aiohttp
 import redis
 from socket import socket, AF_INET, SOCK_STREAM
+from store import Retailer
 
 MAX_BYTES = 1024
 BASE_TARGET_URL = 'https://jsonplaceholder.typicode.com/photos'
@@ -12,14 +13,15 @@ EXPIRATION_TIME = 3600
 
 class Server:
 
-    def __init__(self):
+    def __init__(self, redis_instance: redis.Redis = redis.Redis(db=4), retail: Retailer = Retailer()):
         self._server_socket = None
         self._set_server()
-        self._redis_instance = redis.Redis()
+        self._redis_instance = redis_instance
+        self._retailer = retail
 
     def _set_server(self):
         self._server_socket = socket(AF_INET, SOCK_STREAM)
-        self._server_socket.bind(('', 9998))
+        self._server_socket.bind(('', 9999))
         self._server_socket.listen(1)
 
     def _get_client_socket(self):
@@ -43,6 +45,22 @@ class Server:
         return data
 
     async def _get_targeted_data(self, target: str) -> bytes:
+        order_from_supplier = re.search(r'/retailer/order/[0-9]+', target)
+        if order_from_supplier:
+            positions_count = order_from_supplier.group().split('/')[3]
+            self._retailer.order_latest_from_supplier(int(positions_count))
+            return b'Goods delivered'
+        if target == '/retailer/info':
+            data = b''
+            for item_id, item_info in self._retailer.get_all_info():
+                data += item_id
+                data += b'\r\n'
+                for k, v in item_info.items():
+                    data += k + b':' + v + b'\r\n'
+                data += b'\r\n'
+            return data
+        if target == '/retailer/order/':
+            self._retailer.order_latest_from_supplier(1)
         key = ''
         if target == '/photos':
             key = BASE_TARGET_URL
@@ -50,7 +68,6 @@ class Server:
         if single_photo_request:
             photo_id = single_photo_request.group().split('/')[2]
             key = BASE_TARGET_URL + '/' + photo_id
-
         data = await self._get_or_set_cache(key)
         return data
 

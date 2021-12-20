@@ -51,8 +51,10 @@ class NotEnoughInStock(Exception):
 
 class Retailer:
 
-    def __init__(self, supplier: Supplier = Supplier()):
-        self._redis_instance = redis.Redis(db=4)
+    def __init__(self, redis_instance: redis.Redis = redis.Redis(db=4),
+                 supplier: Supplier = Supplier()
+                 ):
+        self._redis_instance = redis_instance
         self._supplier = supplier
 
     def order_latest_from_supplier(self, positions_count: int = 0):
